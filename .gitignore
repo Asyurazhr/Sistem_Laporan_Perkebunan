@@ -34,3 +34,10 @@ dist-ssr
 # Environment variables
 .env*
 !.env.example
+
+
+# Build output
+.output/
+.wrangler/
+node_modules/
+
