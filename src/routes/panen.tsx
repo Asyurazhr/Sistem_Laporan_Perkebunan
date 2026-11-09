@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { BarChart3, ClipboardList, Leaf, Plus } from 'lucide-react';
 import { Badge, Shell, StatCard } from '@/components/shell';
-import { EditedLink, Field, KeteranganEdit, Modal, RiwayatDialog, RowActions, Table } from '@/components/data-form';
+import { EditedLink, FILTER_WAKTU_AWAL, Field, FilterBar, KeteranganEdit, Modal, RiwayatDialog, RowActions, Table, rapikanKeterangan, saringWaktu, validasiKeterangan, type FilterWaktu } from '@/components/data-form';
 import { buatRiwayat, useCollection, type Panen } from '@/lib/store';
 
 export const Route = createFileRoute('/panen')({
@@ -27,14 +27,46 @@ const LABEL: Record<string, string> = {
   status: 'Status',
 };
 
+type ErrorPanen = Partial<Record<'jumlahPohon' | 'totalHasil' | 'keterangan', string>>;
+
+// Aturan validasi input panen
+function validasiPanen(jumlahPohon: string, totalHasil: string): ErrorPanen {
+  const err: ErrorPanen = {};
+
+  const pohon = Number(jumlahPohon);
+  if (jumlahPohon.trim() === '') err.jumlahPohon = 'Jumlah pohon wajib diisi.';
+  else if (!Number.isFinite(pohon)) err.jumlahPohon = 'Jumlah pohon harus berupa angka.';
+  else if (!Number.isInteger(pohon)) err.jumlahPohon = 'Jumlah pohon harus bilangan bulat.';
+  else if (pohon < 1) err.jumlahPohon = 'Jumlah pohon minimal 1.';
+
+  const hasil = Number(totalHasil);
+  if (totalHasil.trim() === '') err.totalHasil = 'Total hasil wajib diisi.';
+  else if (!Number.isFinite(hasil)) err.totalHasil = 'Total hasil harus berupa angka.';
+  else if (hasil <= 0) err.totalHasil = 'Total hasil harus lebih dari 0 kg.';
+
+  return err;
+}
+
 function PanenPage() {
   const { items, add, update, remove } = useCollection<Panen>('panen');
   const [filter, setFilter] = useState('Semua');
+  const [waktu, setWaktu] = useState<FilterWaktu>(FILTER_WAKTU_AWAL);
   const [editing, setEditing] = useState<Panen | null>(null);
   const [open, setOpen] = useState(false);
   const [riwayat, setRiwayat] = useState<Panen | null>(null);
+  const [errors, setErrors] = useState<ErrorPanen>({});
 
-  const rows = filter === 'Semua' ? items : items.filter((i) => i.jenis === filter);
+  const tutupModal = () => {
+    setOpen(false);
+    setEditing(null);
+    setErrors({});
+  };
+
+  // Hapus pesan error sebuah kolom ketika admin mulai mengetik ulang
+  const hapusError = (field: keyof ErrorPanen) => () => setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+
+  // Saring berdasarkan komoditas, lalu rentang waktu (hasil diurutkan dari tanggal terbaru)
+  const rows = saringWaktu(filter === 'Semua' ? items : items.filter((i) => i.jenis === filter), waktu);
   const totalHasil = items.reduce((s, i) => s + i.totalHasil, 0);
   const unik = new Set(items.map((i) => i.jenis)).size;
 
@@ -42,6 +74,15 @@ function PanenPage() {
     e.preventDefault();
 
     const f = new FormData(e.currentTarget);
+
+    // Validasi dulu, jangan simpan kalau masih ada yang salah
+    const err = validasiPanen(String(f.get('jumlahPohon') ?? ''), String(f.get('totalHasil') ?? ''));
+    if (editing) {
+      const errKet = validasiKeterangan(String(f.get('keterangan') ?? ''));
+      if (errKet) err.keterangan = errKet;
+    }
+    setErrors(err);
+    if (Object.keys(err).length > 0) return;
 
     const data = {
       jenis: String(f.get('jenis')),
@@ -54,7 +95,7 @@ function PanenPage() {
     let success = false;
 
     if (editing) {
-      const log = buatRiwayat(editing, data, LABEL, editing.riwayat, String(f.get('keterangan') ?? '').trim());
+      const log = buatRiwayat(editing, data, LABEL, editing.riwayat, rapikanKeterangan(String(f.get('keterangan') ?? '')));
 
       success = await update(editing.id, {
         ...data,
@@ -69,8 +110,7 @@ function PanenPage() {
 
     if (!success) return;
 
-    setOpen(false);
-    setEditing(null);
+    tutupModal();
   };
 
   return (
@@ -82,6 +122,7 @@ function PanenPage() {
         <button
           onClick={() => {
             setEditing(null);
+            setErrors({});
             setOpen(true);
           }}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -90,23 +131,13 @@ function PanenPage() {
         </button>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-4">
         <StatCard label="Total Data" value={String(items.length)} icon={ClipboardList} />
         <StatCard label="Total Hasil" value={`${totalHasil} kg`} icon={BarChart3} />
         <StatCard label="Tanaman Unik" value={String(unik)} icon={Leaf} />
       </div>
 
-      <div className="my-6 flex flex-wrap gap-2">
-        {['Semua', ...JENIS].map((j) => (
-          <button
-            key={j}
-            onClick={() => setFilter(j)}
-            className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${filter === j ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-foreground hover:bg-secondary'}`}
-          >
-            {j}
-          </button>
-        ))}
-      </div>
+      <FilterBar pilihan={JENIS} kategori={filter} onKategori={setFilter} waktu={waktu} onWaktu={setWaktu} />
 
       <Table head={['Jenis Tanaman', 'Tanggal Panen', 'Jumlah Pohon', 'Total Hasil', 'Status', 'Aksi', 'Keterangan']}>
         {rows.map((r) => (
@@ -124,6 +155,7 @@ function PanenPage() {
               <RowActions
                 onEdit={() => {
                   setEditing(r);
+                  setErrors({});
                   setOpen(true);
                 }}
                 onDelete={() => remove(r.id)}
@@ -137,7 +169,7 @@ function PanenPage() {
         {rows.length === 0 && (
           <tr>
             <td colSpan={7} className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Belum ada data panen.
+              {items.length === 0 ? 'Belum ada data panen.' : 'Tidak ada data panen yang sesuai filter.'}
             </td>
           </tr>
         )}
@@ -146,18 +178,34 @@ function PanenPage() {
       <Modal
         open={open}
         title={editing ? 'Edit Panen' : 'Tambah Panen'}
-        onClose={() => {
-          setOpen(false);
-          setEditing(null);
-        }}
+        onClose={tutupModal}
         onSubmit={submit}
       >
         <Field label="Jenis Tanaman" name="jenis" options={JENIS} defaultValue={editing?.jenis} />
         <Field label="Tanggal Panen" name="tanggal" type="date" defaultValue={editing?.tanggal} />
-        <Field label="Jumlah Pohon" name="jumlahPohon" type="number" defaultValue={editing?.jumlahPohon ?? 0} />
-        <Field label="Total Hasil (kg)" name="totalHasil" type="number" defaultValue={editing?.totalHasil ?? 0} />
+        <Field
+          label="Jumlah Pohon"
+          name="jumlahPohon"
+          type="number"
+          integer
+          required={false}
+          placeholder="Minimal 1"
+          defaultValue={editing?.jumlahPohon ?? ''}
+          error={errors.jumlahPohon}
+          onChange={hapusError('jumlahPohon')}
+        />
+        <Field
+          label="Total Hasil (kg)"
+          name="totalHasil"
+          type="number"
+          required={false}
+          placeholder="Contoh: 12,5"
+          defaultValue={editing?.totalHasil ?? ''}
+          error={errors.totalHasil}
+          onChange={hapusError('totalHasil')}
+        />
         <Field label="Status" name="status" options={STATUS} defaultValue={editing?.status} full />
-        {editing && <KeteranganEdit />}
+        {editing && <KeteranganEdit validasiBrowser={false} error={errors.keterangan} onChange={hapusError('keterangan')} />}
       </Modal>
 
       {riwayat && <RiwayatDialog subtitle={riwayat.jenis} riwayat={riwayat.riwayat ?? []} onClose={() => setRiwayat(null)} />}
