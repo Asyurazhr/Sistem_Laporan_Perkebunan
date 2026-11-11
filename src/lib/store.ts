@@ -8,6 +8,10 @@ export type Panen = {
   jumlahPohon: number;
   totalHasil: number;
   status: string;
+  lokasiId?: string | null;
+  lokasi?: string;
+  luasPanen?: number | null;
+  satuanLuas?: string | null;
   riwayat?: Riwayat[];
 };
 
@@ -42,6 +46,23 @@ export type Laporan = {
   riwayat?: Riwayat[];
 };
 
+// Tipe data lokasi kebun
+export type LokasiKebun = {
+  id: string;
+  nama: string;
+  alamat: string;
+  luas: number;
+  satuan: string;
+};
+
+// Tipe data tanaman pada setiap lokasi
+export type LokasiTanaman = {
+  id: string;
+  lokasiId: string;
+  nama: string;
+  luas: number;
+};
+
 type CollectionKey = 'panen' | 'pascapanen' | 'laporan';
 
 type CollectionItem = Panen | Pascapanen | Laporan;
@@ -54,7 +75,7 @@ const TABLES: Record<CollectionKey, string> = {
 
 // Mengambil data dari Supabase
 async function fetchCollection(key: CollectionKey) {
-  const selectQuery = key === 'laporan' ? '*' : '*, komoditas(nama)';
+  const selectQuery = key === 'laporan' ? '*' : key === 'panen' ? '*, komoditas(nama), lokasi_kebun(nama)' : '*, komoditas(nama)';
 
   const { data, error } = await supabase.from(TABLES[key]).select(selectQuery).order('created_at', { ascending: false });
 
@@ -69,6 +90,10 @@ async function fetchCollection(key: CollectionKey) {
         jumlahPohon: Number(row.jumlah_pohon),
         totalHasil: Number(row.total_hasil),
         status: row.status,
+        lokasiId: row.lokasi_id ?? null,
+        lokasi: row.lokasi_kebun?.nama ?? '',
+        luasPanen: row.luas_panen == null ? null : Number(row.luas_panen),
+        satuanLuas: row.satuan_luas ?? null,
         riwayat: row.riwayat ?? [],
       } satisfies Panen;
     }
@@ -98,17 +123,52 @@ async function fetchCollection(key: CollectionKey) {
   });
 }
 
-// Mencari ID komoditas berdasarkan nama
-async function getKomoditasId(nama: string): Promise<string> {
-  const { data, error } = await supabase.from('komoditas').select('id').eq('nama', nama).single();
+// Mengambil daftar lokasi kebun
+export async function fetchLokasiKebun(): Promise<LokasiKebun[]> {
+  const { data, error } = await supabase.from('lokasi_kebun').select('id, nama, alamat, luas, satuan').order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  if (!data) {
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    nama: row.nama,
+    alamat: row.alamat,
+    luas: Number(row.luas),
+    satuan: row.satuan,
+  }));
+}
+
+// Mengambil daftar tanaman berdasarkan lokasi yang dipilih
+export async function fetchTanamanByLokasi(lokasiId: string): Promise<LokasiTanaman[]> {
+  const { data, error } = await supabase.from('lokasi_tanaman').select('id, lokasi_id, nama, luas').eq('lokasi_id', lokasiId).order('nama', { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    lokasiId: row.lokasi_id,
+    nama: row.nama,
+    luas: Number(row.luas),
+  }));
+}
+
+// Mencari ID komoditas berdasarkan nama
+async function getKomoditasId(nama: string): Promise<string> {
+  const { data, error } = await supabase.from('komoditas').select('id, nama').ilike('nama', nama);
+
+  if (error) throw error;
+
+  const komoditas = (data ?? []).filter((item) => item.nama.toLowerCase() === nama.toLowerCase());
+
+  if (komoditas.length === 0) {
     throw new Error(`Komoditas ${nama} tidak ditemukan.`);
   }
 
-  return data.id;
+  if (komoditas.length > 1) {
+    throw new Error(`Komoditas ${nama} memiliki data ganda.`);
+  }
+
+  return komoditas[0].id;
 }
 
 // Mengubah format frontend menjadi kolom database
@@ -116,14 +176,24 @@ async function toDatabase(key: CollectionKey, item: any) {
   if (key === 'panen') {
     const komoditasId = await getKomoditasId(item.jenis);
 
-    return {
+    const payload: Record<string, any> = {
       komoditas_id: komoditasId,
       tanggal: item.tanggal,
       jumlah_pohon: item.jumlahPohon,
       total_hasil: item.totalHasil,
       status: item.status,
       riwayat: item.riwayat ?? [],
+      luas_panen: item.luasPanen ?? null,
+      satuan_luas: item.satuanLuas ?? null,
     };
+
+    // Hanya mengirim lokasi_id jika properti tersedia.
+    // Ini menjaga lokasi pada data lama ketika form belum diperbarui.
+    if (item.lokasiId !== undefined) {
+      payload.lokasi_id = item.lokasiId || null;
+    }
+
+    return payload;
   }
 
   if (key === 'pascapanen') {

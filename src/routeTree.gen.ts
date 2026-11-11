@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LaporanRouteImport } from './routes/laporan'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LokasiRouteImport } from './routes/lokasi'
 import { Route as PanenRouteImport } from './routes/panen'
 import { Route as PascapanenRouteImport } from './routes/pascapanen'
 
@@ -30,6 +31,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LokasiRoute = LokasiRouteImport.update({
+  id: '/lokasi',
+  path: '/lokasi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PanenRoute = PanenRouteImport.update({
   id: '/panen',
   path: '/panen',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/laporan': typeof LaporanRoute
   '/login': typeof LoginRoute
+  '/lokasi': typeof LokasiRoute
   '/panen': typeof PanenRoute
   '/pascapanen': typeof PascapanenRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/laporan': typeof LaporanRoute
   '/login': typeof LoginRoute
+  '/lokasi': typeof LokasiRoute
   '/panen': typeof PanenRoute
   '/pascapanen': typeof PascapanenRoute
 }
@@ -60,21 +68,30 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/laporan': typeof LaporanRoute
   '/login': typeof LoginRoute
+  '/lokasi': typeof LokasiRoute
   '/panen': typeof PanenRoute
   '/pascapanen': typeof PascapanenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/laporan' | '/login' | '/panen' | '/pascapanen'
+  fullPaths: '/' | '/laporan' | '/login' | '/lokasi' | '/panen' | '/pascapanen'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/laporan' | '/login' | '/panen' | '/pascapanen'
-  id: '__root__' | '/' | '/laporan' | '/login' | '/panen' | '/pascapanen'
+  to: '/' | '/laporan' | '/login' | '/lokasi' | '/panen' | '/pascapanen'
+  id:
+    | '__root__'
+    | '/'
+    | '/laporan'
+    | '/login'
+    | '/lokasi'
+    | '/panen'
+    | '/pascapanen'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LaporanRoute: typeof LaporanRoute
   LoginRoute: typeof LoginRoute
+  LokasiRoute: typeof LokasiRoute
   PanenRoute: typeof PanenRoute
   PascapanenRoute: typeof PascapanenRoute
 }
@@ -102,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lokasi': {
+      id: '/lokasi'
+      path: '/lokasi'
+      fullPath: '/lokasi'
+      preLoaderRoute: typeof LokasiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/panen': {
       id: '/panen'
       path: '/panen'
@@ -123,6 +147,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LaporanRoute: LaporanRoute,
   LoginRoute: LoginRoute,
+  LokasiRoute: LokasiRoute,
   PanenRoute: PanenRoute,
   PascapanenRoute: PascapanenRoute,
 }

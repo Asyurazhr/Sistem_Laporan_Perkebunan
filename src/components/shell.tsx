@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router';
-import { CalendarDays, LayoutDashboard, Users, Sprout, Package, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Users, Sprout, Package, MapPin, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { tanggalPanjang } from '@/lib/store';
 import { SidebarUser, LogoutButton } from '@/components/logout-button';
@@ -9,6 +9,7 @@ const nav = [
   { to: '/panen', label: 'Data Panen', short: 'Panen', icon: Sprout },
   { to: '/pascapanen', label: 'Data Pascapanen', short: 'Pascapanen', icon: Package },
   { to: '/laporan', label: 'Laporan Karyawan', short: 'Laporan', icon: Users },
+  { to: '/lokasi', label: 'Lokasi Perkebunan', short: 'Lokasi', icon: MapPin },
 ] as const;
 
 export function Shell({ title, heading, subtitle, action, children }: { title: string; heading: string; subtitle: string; action?: ReactNode; children: ReactNode }) {
@@ -88,7 +89,11 @@ export function Shell({ title, heading, subtitle, action, children }: { title: s
               </div>
             </div>
             {/* Di HP tombol aksi (mis. "Tambah Panen") hanya berupa tombol bulat "+" di kanan */}
-            {action && <div className="shrink-0 max-sm:[&>button]:h-8 max-sm:[&>button]:w-8 max-sm:[&>button]:justify-center max-sm:[&>button]:gap-0 max-sm:[&>button]:rounded-full max-sm:[&>button]:p-0 max-sm:[&>button]:text-[0px] max-sm:[&>button]:shadow-sm max-sm:[&_svg]:h-4 max-sm:[&_svg]:w-4">{action}</div>}
+            {action && (
+              <div className="shrink-0 max-sm:[&>button]:h-8 max-sm:[&>button]:w-8 max-sm:[&>button]:justify-center max-sm:[&>button]:gap-0 max-sm:[&>button]:rounded-full max-sm:[&>button]:p-0 max-sm:[&>button]:text-[0px] max-sm:[&>button]:shadow-sm max-sm:[&_svg]:h-4 max-sm:[&_svg]:w-4">
+                {action}
+              </div>
+            )}
           </div>
           {children}
         </main>
@@ -96,7 +101,7 @@ export function Shell({ title, heading, subtitle, action, children }: { title: s
 
       {/* ===== Menu bawah (khusus HP) ===== */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {nav.map((item) => {
             const active = isActive(item.to);
             return (
